@@ -98,12 +98,9 @@ class SupabaseClient:
             sections = sections_result.data
             
             # Combine all data
-            document_type_data = {
-                "document_type": doc_type,
-                "sections": sections
-            }
+            doc_type['sections'] = sections
             
-            return document_type_data
+            return doc_type
         except Exception as e:
             raise Exception(f"Failed to retrieve document type: {str(e)}")
     
@@ -167,10 +164,9 @@ class SupabaseClient:
         except Exception as e:
             raise Exception(f"Failed to retrieve document contents: {str(e)}")
     
-    def create_or_update_document(self, project_id: str, doc_type_id: str, title: str, 
-                                 content_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def create_document(self, project_id: str, doc_type_id: str) -> Dict[str, Any]:
         """
-        Create a new document or update an existing one.
+        Create a new document.
         
         Args:
             project_id: The ID of the project
@@ -179,80 +175,108 @@ class SupabaseClient:
             content_items: List of content items, each containing subsection_id and content
         
         Returns:
-            Dict: The created or updated document data
+            Dict: The created document data
         """
         try:
-            # Check if document already exists with a single query
+            # Check if document already exists
             doc_result = self.client.from_("documents") \
                 .select("*") \
                 .eq("project_id", project_id) \
                 .eq("document_type_id", doc_type_id) \
                 .execute()
             
-            # Create or update document
-            document = None
-            if not doc_result.data or len(doc_result.data) == 0:
-                # Create new document
-                new_doc = {
-                    "title": title,
-                    "project_id": project_id,
-                    "document_type_id": doc_type_id,
-                    "status": "draft"
-                }
-                doc_result = self.client.table("documents").insert(new_doc).execute()
-                document = doc_result.data[0]
-            else:
-                # Update existing document
-                document = doc_result.data[0]
-                updates = {
-                    "title": title,
-                    "updated_at": datetime.now().isoformat()
-                }
-                doc_result = self.client.table("documents") \
-                    .update(updates) \
-                    .eq("id", document["id"]) \
-                    .execute()
-                document = doc_result.data[0]
+            # If document already exists, raise an exception
+            if doc_result.data and len(doc_result.data) > 0:
+                raise Exception(f"Document already exists for project {project_id} and document type {doc_type_id}")
             
-            document_id = document["id"]
-            
-            # Get all existing content for this document in a single query
-            existing_content_result = self.client.from_("document_content") \
-                .select("id, document_subsection_id") \
-                .eq("document_id", document_id) \
+            doc_type_result = self.client.from_("document_types") \
+                .select("*") \
+                .eq("id", doc_type_id) \
                 .execute()
             
-            # Create a map of subsection_id to content_id for quick lookup
-            existing_content_map = {
-                item["document_subsection_id"]: item["id"] 
-                for item in existing_content_result.data
-            }
+            if not doc_type_result.data or len(doc_type_result.data) < 1:
+                raise Exception(f"No Document Type found for id: {doc_type_id}")
             
-            # Process each content item
-            for item in content_items:
-                subsection_id = item["subsection_id"]
-                content = item["content"]
-                
-                if subsection_id in existing_content_map:
-                    # Update existing content
-                    content_id = existing_content_map[subsection_id]
-                    updates = {
-                        "content": content,
-                        "updated_at": datetime.now().isoformat()
-                    }
-                    self.client.table("document_content") \
-                        .update(updates) \
-                        .eq("id", content_id) \
-                        .execute()
-                else:
-                    # Create new content
+            doc_type = doc_type_result.data[0]
+            
+            # Create new document
+            new_doc = {
+                "title": doc_type['name'],
+                "project_id": project_id,
+                "document_type_id": doc_type_id,
+                "status": "draft"
+            }
+            doc_result = self.client.table("documents").insert(new_doc).execute()
+            document = doc_result.data[0]
+            document_id = document["id"]
+
+            sections_result = self.client.from_("document_sections") \
+                .select("""
+                    *,
+                    document_subsections(*)
+                """) \
+                .eq("document_type_id", doc_type_id) \
+                .order("order") \
+                .execute()
+            
+            # Add empty contents placeholders
+            section_inserts = []
+            for section in sections_result.data:
+                for subsection in section['document_subsections']:
                     new_content = {
                         "document_id": document_id,
-                        "document_subsection_id": subsection_id,
-                        "content": content
+                        "document_subsection_id": subsection['id'],
+                        "content": ""
                     }
-                    self.client.table("document_content").insert(new_content).execute()
+                    section_inserts.append(new_content)
+            
+            self.client.table("document_content").insert(section_inserts).execute()
             
             return self.get_document_contents(project_id, doc_type_id)
         except Exception as e:
-            raise Exception(f"Failed to create or update document: {str(e)}")
+            raise Exception(f"Failed to create document: {str(e)}")
+    
+    def update_document_content(self, document_id: str, content_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Update an existing document's content.
+        
+        Args:
+            document_id: The ID of the document to update
+            content_items: List of content items, each containing subsection_id and content
+        
+        Returns:
+            Dict: The updated document data
+        """
+        try:
+            # Check if document exists
+            doc_result = self.client.from_("documents") \
+                .select("*") \
+                .eq("id", document_id) \
+                .execute()
+            
+            # If document doesn't exist, raise an exception
+            if not doc_result.data or len(doc_result.data) == 0:
+                raise Exception(f"Document with ID {document_id} not found")
+            
+            document = doc_result.data[0]
+            project_id = document["project_id"]
+            doc_type_id = document["document_type_id"]
+            
+            # Process each content item
+            content_updates = []
+            for item in content_items:
+                subsection_id = item["subsection_id"]
+                content = item["content"]
+
+                content_update = {
+                    "document_id": document_id,
+                    "document_subsection_id": subsection_id,
+                    "content": content
+                }
+                content_updates.append(content_updates)
+            
+            self.client.table("document_content").upsert(content_updates).execute()
+            
+            return self.get_document_contents(project_id, doc_type_id)
+        except Exception as e:
+            raise Exception(f"Failed to update document: {str(e)}")
