@@ -60,14 +60,14 @@ class DocumentSection(BaseModel):
     order: int
     created_at: str
     updated_at: Optional[str] = None
-    subsections: Optional[List[DocumentSubsection]] = None
+    document_subsections: Optional[List[DocumentSubsection]] = None
 
 class DocumentType(BaseModel):
     id: str
     name: str
     created_at: str
     updated_at: Optional[str] = None
-    sections: Optional[List[DocumentSection]]
+    document_sections: Optional[List[DocumentSection]]
 
 class DocumentContent(BaseModel):
     id: str

@@ -98,7 +98,7 @@ class SupabaseClient:
             sections = sections_result.data
             
             # Combine all data
-            doc_type['sections'] = sections
+            doc_type['document_sections'] = sections
             
             return doc_type
         except Exception as e:
