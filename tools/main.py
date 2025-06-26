@@ -43,15 +43,56 @@ class Project(BaseModel):
     created_at: str
     updated_at: Optional[str] = None
 
-class BusinessPlan(BaseModel):
+class DocumentType(BaseModel):
     id: str
-    project_id: str
+    name: str
     created_at: str
-    content: Optional[str]
-    update_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
-class BusinessPlanUpdate(BaseModel):
-    content: str
+class DocumentSection(BaseModel):
+    id: str
+    document_type_id: str
+    name: str
+    order: int
+    created_at: str
+    updated_at: Optional[str] = None
+    subsections: Optional[List[Any]] = None
+
+class DocumentSubsection(BaseModel):
+    id: str
+    document_section_id: str
+    name: str
+    order: int
+    priority: int
+    content_type: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+class Document(BaseModel):
+    id: str
+    title: str
+    document_type_id: str
+    project_id: str
+    chat_id: Optional[str] = None
+    status: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+class DocumentContent(BaseModel):
+    id: str
+    document_id: str
+    document_subsection_id: str
+    content: Dict[str, Any]
+    created_at: str
+    updated_at: Optional[str] = None
+
+class DocumentContentItem(BaseModel):
+    subsection_id: str
+    content: Dict[str, Any]
+
+class DocumentUpdate(BaseModel):
+    title: str
+    content_items: List[DocumentContentItem]
 
 # Routes
 @app.get("/")
@@ -75,29 +116,44 @@ async def get_project(project_id: str):
     """
     return supabase_client.get_project(project_id)
 
-# Business plan endpoints
-@app.get("/business_plans/{plan_id}", response_model=BusinessPlan, operation_id="get_business_plan")
-async def get_business_plan(plan_id: str):
+# Document endpoints
+@app.get("/document_types/{doc_type_name}", operation_id="get_document_type")
+async def get_document_type(doc_type_name: str):
     """
-    Retrieve a business plan by ID.
+    Retrieve document type information including all sections and metadata.
     """
     try:
-        result = supabase_client.get_business_plan(plan_id)
+        result = supabase_client.get_document_type(doc_type_name)
         return result
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Business plan not found: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Document type not found: {str(e)}")
 
-@app.patch("/business_plans/{plan_id}", response_model=BusinessPlan, operation_id="update_business_plan")
-async def update_business_plan(plan_id: str, updates: BusinessPlanUpdate):
+@app.get("/documents/{project_id}/{doc_type_id}", operation_id="get_document_contents")
+async def get_document_contents(project_id: str, doc_type_id: str):
     """
-    Update a business plan with new information.
-    Only the provided fields will be updated.
+    Retrieve all existing contents of a document.
     """
     try:
-        result = supabase_client.update_business_plan(plan_id, updates.dict(exclude_unset=True))
+        result = supabase_client.get_document_contents(project_id, doc_type_id)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update business plan: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Document not found: {str(e)}")
+
+@app.post("/documents/{project_id}/{doc_type_id}", operation_id="create_or_update_document")
+async def create_or_update_document(project_id: str, doc_type_id: str, document_update: DocumentUpdate):
+    """
+    Create a new document or update an existing one.
+    """
+    try:
+        result = supabase_client.create_or_update_document(
+            project_id=project_id,
+            doc_type_id=doc_type_id,
+            title=document_update.title,
+            content_items=document_update.content_items
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create or update document: {str(e)}")
 
 # Add more endpoints as needed for NextCloud and WordPress integration
 
