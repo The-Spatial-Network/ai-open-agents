@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 # Import utility modules
 from python.utils.supabase import SupabaseClient
@@ -37,11 +37,27 @@ supabase_client = SupabaseClient(
 class Project(BaseModel):
     id: str
     title: str
+    category: Optional[str] = None
+    created_at: Optional[str] = None
+    created_by: str
+    funding_needs: Optional[str] = None
+    guilds: Optional[List[str]] = None
+    latitude: Optional[float] = None
     location: Optional[str] = None
-    description: Optional[str] = None
+    longitude: Optional[float] = None
+    power: Optional[str] = None
     property_status: str
-    created_at: str
+    soil: Optional[str] = None
+    structures: Optional[List[str]] = None
+    team: Optional[List[str]] = None
     updated_at: Optional[str] = None
+    values_mission_goals: Optional[str] = None
+    water: Optional[str] = None
+    zone_0: Optional[str] = None
+    zone_1: Optional[str] = None
+    zone_2: Optional[str] = None
+    zone_3: Optional[str] = None
+    zone_4: Optional[str] = None
 
 class DocumentSubsection(BaseModel):
     id: str
