@@ -178,16 +178,6 @@ class SupabaseClient:
             Dict: The created document data
         """
         try:
-            # Check if document already exists
-            doc_result = self.client.from_("documents") \
-                .select("*") \
-                .eq("project_id", project_id) \
-                .eq("document_type_id", doc_type_id) \
-                .execute()
-            
-            # If document already exists, raise an exception
-            if doc_result.data and len(doc_result.data) > 0:
-                raise Exception(f"Document already exists for project {project_id} and document type {doc_type_id}")
             
             doc_type_result = self.client.from_("document_types") \
                 .select("*") \
@@ -198,6 +188,17 @@ class SupabaseClient:
                 raise Exception(f"No Document Type found for id: {doc_type_id}")
             
             doc_type = doc_type_result.data[0]
+
+            # Check if document already exists
+            doc_result = self.client.from_("documents") \
+                .select("*") \
+                .eq("project_id", project_id) \
+                .eq("document_type_id", doc_type_id) \
+                .execute()
+
+            # If document already exists, return it
+            if doc_result.data and len(doc_result.data) > 0:
+                return self.get_document_contents(project_id, doc_type_id)
             
             # Create new document
             new_doc = {
