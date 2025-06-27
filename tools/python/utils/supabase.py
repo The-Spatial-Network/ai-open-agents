@@ -273,7 +273,7 @@ class SupabaseClient:
                     "document_subsection_id": subsection_id,
                     "content": content
                 }
-                content_updates.append(content_updates)
+                content_updates.append(content_update)
             
             self.client.table("document_content").upsert(content_updates).execute()
             

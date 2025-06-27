@@ -160,7 +160,7 @@ async def update_document_content(document_id: str, content_updates: ContentUpda
     Update an existing document.
     """
     try:
-        result = supabase_client.update_document(
+        result = supabase_client.update_document_content(
             document_id=document_id,
             content_items=content_updates.content_items
         )
