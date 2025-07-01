@@ -156,7 +156,7 @@ async def get_document_contents(project_id: str, doc_type_id: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Document not found: {str(e)}")
 
-@app.post("/documents/{project_id}/{doc_type_id}", operation_id="create_document")
+@app.post("/documents/{project_id}/{doc_type_id}", response_model=Document, operation_id="create_document")
 async def create_document(project_id: str, doc_type_id: str):
     """
     Create a new document.
@@ -170,7 +170,7 @@ async def create_document(project_id: str, doc_type_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
 
-@app.put("/documents/{document_id}", operation_id="update_document_content")
+@app.put("/documents/{document_id}", response_model=Document, operation_id="update_document_content")
 async def update_document_content(document_id: str, content_updates: ContentUpdate):
     """
     Update an existing document.
