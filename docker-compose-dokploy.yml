@@ -3,7 +3,7 @@ version: '3'
 services:
   # Open Web UI service
   open-web-ui:
-    image: ghcr.io/open-webui/open-webui:0.6
+    image: ghcr.io/serenelion/open-webui:git-3edfd5f
     container_name: open-web-ui
     restart: unless-stopped
     ports:
