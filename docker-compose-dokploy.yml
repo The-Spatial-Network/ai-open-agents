@@ -12,6 +12,7 @@ services:
       OPENAI_API_BASE_URL: '${OPEN_ROUTER_API_BASE}'
       OPENAI_API_KEY: '${OPEN_ROUTER_API_KEY}'
       ENABLE_OLLAMA_API: 'false'
+      GLOBAL_LOG_LEVEL: ${GLOBAL_LOG_LEVEL}
       TOOL_SERVER_CONNECTIONS: |-
         [
           {
