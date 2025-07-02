@@ -31,7 +31,6 @@ services:
 
   # Custom Tool Server
   tool-server:
-    image: ghcr.io/the-spatial-network/ai-open-agents/tool-server:latest
     build:
       context: ./tools
       dockerfile: Dockerfile
@@ -42,6 +41,7 @@ services:
     environment:
       - SUPABASE_API_URL=${SUPABASE_API_URL}
       - SUPABASE_API_KEY=${SUPABASE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
     volumes:
       - ./tools:/app
     networks:

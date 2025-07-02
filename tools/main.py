@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional, Union
 
 # Import utility modules
 from python.utils.supabase import SupabaseClient
+from python.utils.github import GitHubClient
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,15 @@ supabase_client = SupabaseClient(
     api_url=os.getenv("SUPABASE_API_URL"),
     api_key=os.getenv("SUPABASE_API_KEY")
 )
+
+# Initialize GitHub client (optional, only if token is provided)
+github_client = None
+github_token = os.getenv("GITHUB_TOKEN")
+if github_token:
+    try:
+        github_client = GitHubClient(github_token)
+    except Exception as e:
+        print(f"Warning: Failed to initialize GitHub client: {e}")
 
 # Models
 class Project(BaseModel):
@@ -111,6 +121,43 @@ class DocumentContentItem(BaseModel):
 class ContentUpdate(BaseModel):
     content_items: List[DocumentContentItem]
 
+# GitHub Models
+class GitHubIssueRequest(BaseModel):
+    owner: str
+    repo: str
+    title: str
+    body: Optional[str] = None
+    labels: Optional[List[str]] = None
+    assignees: Optional[List[str]] = None
+    milestone: Optional[int] = None
+
+class GitHubSimpleIssueRequest(BaseModel):
+    owner: str
+    repo: str
+    title: str
+    body: Optional[str] = None
+
+class GitHubRepository(BaseModel):
+    owner: str
+    name: str
+    full_name: str
+
+class GitHubIssueResponse(BaseModel):
+    id: int
+    number: int
+    title: str
+    body: str
+    state: str
+    url: str
+    api_url: str
+    labels: List[str]
+    assignees: List[str]
+    milestone: Optional[str] = None
+    created_at: str
+    updated_at: str
+    author: str
+    repository: GitHubRepository
+
 # Routes
 @app.get("/")
 async def root():
@@ -119,11 +166,28 @@ async def root():
 @app.get("/health")
 async def health_check(operation_id="health_check"):
     # Check if Supabase connection is working
+    services = {}
+    overall_status = "healthy"
+    
     try:
         supabase_client.health_check()
-        return {"status": "healthy", "services": {"supabase": "connected"}}
+        services["supabase"] = "connected"
     except Exception as e:
-        return {"status": "unhealthy", "services": {"supabase": str(e)}}
+        services["supabase"] = str(e)
+        overall_status = "unhealthy"
+    
+    # Check GitHub connection if client is available
+    if github_client:
+        try:
+            github_status = github_client.health_check()
+            services["github"] = github_status
+        except Exception as e:
+            services["github"] = {"status": "error", "error": str(e)}
+            overall_status = "unhealthy"
+    else:
+        services["github"] = "not configured"
+    
+    return {"status": overall_status, "services": services}
 
 # Project endpoints
 @app.get("/projects/{project_id}", response_model=Project, operation_id="get_project")
@@ -183,6 +247,59 @@ async def update_document_content(document_id: str, content_updates: ContentUpda
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update document: {str(e)}")
+
+# GitHub endpoints
+@app.post("/github/issues", response_model=GitHubIssueResponse, operation_id="create_github_issue")
+async def create_github_issue(issue_request: GitHubIssueRequest):
+    """
+    Create a new issue in a GitHub repository.
+    """
+    if not github_client:
+        raise HTTPException(
+            status_code=503, 
+            detail="GitHub integration not configured. Please set GITHUB_TOKEN environment variable."
+        )
+    
+    try:
+        result = github_client.create_issue(
+            owner=issue_request.owner,
+            repo=issue_request.repo,
+            title=issue_request.title,
+            body=issue_request.body,
+            labels=issue_request.labels,
+            assignees=issue_request.assignees,
+            milestone=issue_request.milestone
+        )
+        return GitHubIssueResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create GitHub issue: {str(e)}")
+
+@app.post("/github/issues/simple", response_model=GitHubIssueResponse, operation_id="create_simple_github_issue")
+async def create_simple_github_issue(issue_request: GitHubSimpleIssueRequest):
+    """
+    Create a simple GitHub issue with just owner, repo, title, and optional body.
+    This is a simplified endpoint for basic issue creation that avoids URL length constraints.
+    """
+    if not github_client:
+        raise HTTPException(
+            status_code=503, 
+            detail="GitHub integration not configured. Please set GITHUB_TOKEN environment variable."
+        )
+    
+    try:
+        result = github_client.create_issue(
+            owner=issue_request.owner,
+            repo=issue_request.repo,
+            title=issue_request.title,
+            body=issue_request.body
+        )
+        return GitHubIssueResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create GitHub issue: {str(e)}")
 
 # Add more endpoints as needed for NextCloud and WordPress integration
 
