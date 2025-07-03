@@ -1,0 +1,48 @@
+# Simplified Jaguar SDK Dockerfile for Dokploy deployment
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache libc6-compat curl
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml* ./
+
+# Install pnpm and dependencies
+RUN npm install -g pnpm@9.12.3
+RUN pnpm install --no-frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Create database directory
+RUN mkdir -p /app/data
+
+# Environment variables
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Build the application using pnpm
+RUN pnpm run build
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Change ownership
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Start the application
+CMD ["pnpm", "start"]

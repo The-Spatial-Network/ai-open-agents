@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Open Web UI service - already configured for ai.thespatialnetwork.net
+  open-web-ui:
+    image: ghcr.io/open-webui/open-webui:0.6
+    container_name: open-web-ui
+    restart: unless-stopped
+    ports:
+      - "8080"
+    environment:
+      OPENAI_API_BASE_URL: '${OPEN_ROUTER_API_BASE}'
+      OPENAI_API_KEY: '${OPEN_ROUTER_API_KEY}'
+      ENABLE_OLLAMA_API: 'false'
+      TOOL_SERVER_CONNECTIONS: |-
+        [
+          {
+            "url": "http://tool-server:8000",
+            "path": "openapi.json",
+            "auth_type": "bearer",
+            "key": "${TOOL_SERVER_API_KEY}",
+            "config": {"enable": true}
+          }
+        ]
+    volumes:
+      - open-web-ui-data:/app/backend/data
+    networks:
+      - dokploy-network
+    depends_on:
+      - tool-server
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.open-web-ui.rule=Host(`ai.thespatialnetwork.net`)"
+      - "traefik.http.routers.open-web-ui.entrypoints=websecure"
+      - "traefik.http.routers.open-web-ui.tls.certResolver=letsencrypt"
+      - "traefik.http.services.open-web-ui.loadbalancer.server.port=8080"
+
+  # Custom Tool Server with GitHub integration
+  tool-server:
+    image: ghcr.io/the-spatial-network/ai-open-agents/tool-server:latest
+    build:
+      context: ./packages/ai-open-agents/tools
+      dockerfile: Dockerfile
+    container_name: ai-tool-server
+    restart: unless-stopped
+    ports:
+      - "8000"
+    environment:
+      - SUPABASE_API_URL=${SUPABASE_API_URL}
+      - SUPABASE_API_KEY=${SUPABASE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+    networks:
+      - dokploy-network
+
+  # Jaguar SDK Next.js application - NEW for jaguar-sdk.thespatialnetwork.net
+  jaguar-sdk:
+    image: ghcr.io/the-spatial-network/jaguar-sdk:latest
+    build:
+      context: ./packages/jaguar-sdk
+      dockerfile: Dockerfile
+    container_name: jaguar-sdk-app
+    restart: unless-stopped
+    ports:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_URL=${POSTGRES_URL}
+      - JAGUAR_BASE_URL=https://ai.thespatialnetwork.net
+      - JAGUAR_API_KEY=${JAGUAR_API_KEY}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - NEXTAUTH_URL=https://jaguar-sdk.thespatialnetwork.net
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - BLOB_READ_WRITE_TOKEN=${BLOB_READ_WRITE_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_APP_URL=https://jaguar-sdk.thespatialnetwork.net
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - DEFAULT_REPO_OWNER=${DEFAULT_REPO_OWNER}
+      - DEFAULT_REPO_NAME=${DEFAULT_REPO_NAME}
+      - TOOL_SERVER_URL=http://tool-server:8000
+      - TOOL_SERVER_API_KEY=${TOOL_SERVER_API_KEY}
+    networks:
+      - dokploy-network
+    depends_on:
+      - tool-server
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jaguar-sdk.rule=Host(`jaguar-sdk.thespatialnetwork.net`)"
+      - "traefik.http.routers.jaguar-sdk.entrypoints=websecure"
+      - "traefik.http.routers.jaguar-sdk.tls.certResolver=letsencrypt"
+      - "traefik.http.services.jaguar-sdk.loadbalancer.server.port=3000"
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: jaguar-redis
+    restart: unless-stopped
+    ports:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - dokploy-network
+    command: redis-server --appendonly yes
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  open-web-ui-data:
+  redis-data:

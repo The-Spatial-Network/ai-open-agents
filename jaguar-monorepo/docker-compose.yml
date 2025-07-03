@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # Open Web UI service with GitHub integration
+  open-web-ui:
+    image: ghcr.io/open-webui/open-webui:0.6
+    container_name: open-web-ui
+    restart: unless-stopped
+    ports:
+      - "3002:8080"
+    environment:
+      OPENAI_API_BASE_URL: '${OPEN_ROUTER_API_BASE}'
+      OPENAI_API_KEY: '${OPEN_ROUTER_API_KEY}'
+      ENABLE_OLLAMA_API: 'false'
+      TOOL_SERVER_CONNECTIONS: |-
+        [
+          {
+            "url": "http://tool-server:8000",
+            "path": "openapi.json",
+            "auth_type": "bearer",
+            "key": "${TOOL_SERVER_API_KEY}",
+            "config": {"enable": true}
+          }
+        ]
+    volumes:
+      - open-web-ui-data:/app/backend/data
+    networks:
+      - ai-network
+    depends_on:
+      - tool-server
+
+  # Custom Tool Server with GitHub integration
+  tool-server:
+    build:
+      context: ./packages/ai-open-agents/tools
+      dockerfile: Dockerfile
+    container_name: ai-tool-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_API_URL=${SUPABASE_API_URL}
+      - SUPABASE_API_KEY=${SUPABASE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB_DEFAULT_OWNER=${GITHUB_DEFAULT_OWNER}
+      - GITHUB_DEFAULT_REPO=${GITHUB_DEFAULT_REPO}
+    volumes:
+      - ./packages/ai-open-agents/tools:/app
+    networks:
+      - ai-network
+
+  # Jaguar SDK Next.js application
+  jaguar-sdk:
+    build:
+      context: ./packages/jaguar-sdk
+      dockerfile: Dockerfile.optimized
+    container_name: jaguar-sdk-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_URL=file:/app/data/local.db
+      - JAGUAR_BASE_URL=http://open-web-ui:8080
+      - JAGUAR_API_KEY=${JAGUAR_API_KEY:-demo-key}
+      - AUTH_SECRET=jaguar-local-dev-secret-32-chars-minimum-length-required
+      - NEXTAUTH_URL=http://localhost:3000
+      - BLOB_READ_WRITE_TOKEN=${BLOB_READ_WRITE_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TOOL_SERVER_URL=http://tool-server:8000
+      - TOOL_SERVER_API_KEY=${TOOL_SERVER_API_KEY}
+    volumes:
+      - jaguar-db:/app/data
+    networks:
+      - ai-network
+    depends_on:
+      - tool-server
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: jaguar-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-network
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  open-web-ui-data:
+  redis-data:
+  jaguar-db:

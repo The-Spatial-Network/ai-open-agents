@@ -1,0 +1,42 @@
+{
+  "name": "jaguar-monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo for AI Open Agents and Jaguar SDK - Self-evolving AI development platform",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "build": "pnpm --recursive run build",
+    "test": "pnpm --recursive run test",
+    "lint": "pnpm --recursive run lint",
+    "clean": "pnpm --recursive run clean",
+    "install-all": "pnpm install --recursive",
+    "ai-agents:dev": "pnpm --filter ai-open-agents run dev",
+    "jaguar:dev": "pnpm --filter jaguar-sdk run dev",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "openwebui",
+    "jaguar-sdk",
+    "agi",
+    "monorepo",
+    "github-integration",
+    "self-development"
+  ],
+  "author": "The Spatial Network",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

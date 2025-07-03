@@ -1,0 +1,143 @@
+# Multi-stage optimized Dockerfile for Jaguar SDK
+# Solves native dependency compilation issues and reduces final image size
+
+# ================================
+# Stage 1: Dependencies Builder
+# ================================
+FROM node:18-alpine AS deps
+
+# Install comprehensive build environment for native dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    py3-pip \
+    make \
+    g++ \
+    gcc \
+    musl-dev \
+    linux-headers \
+    curl \
+    git
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files only
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
+
+# Install pnpm globally
+RUN corepack enable pnpm
+
+# Install dependencies with proper native compilation
+RUN pnpm install --no-frozen-lockfile --prefer-offline
+
+# ================================
+# Stage 2: Application Builder  
+# ================================
+FROM node:18-alpine AS builder
+
+# Install minimal runtime dependencies
+RUN apk add --no-cache libc6-compat curl
+
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/pnpm-lock.yaml* ./
+
+# Copy source code
+COPY . .
+
+# Set build environment
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV POSTGRES_URL="file:/tmp/build.db"
+
+# Enable pnpm
+RUN corepack enable pnpm
+
+# Build the application (skip migration during build)
+RUN pnpm run build:docker || pnpm exec next build
+
+# ================================
+# Stage 3: Production Runtime
+# ================================
+FROM node:18-alpine AS runner
+
+# Install only runtime dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    curl \
+    dumb-init
+
+WORKDIR /app
+
+# Create system user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Create necessary directories
+RUN mkdir -p /app/data && \
+    chown -R nextjs:nodejs /app/data
+
+# Copy built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copy package.json for runtime dependencies
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+# Copy database migration files if they exist
+COPY --from=builder --chown=nextjs:nodejs /app/lib/ ./lib/
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+
+# Copy minimal node_modules for runtime (tsx for migrations)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.bin/ ./node_modules/.bin/
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/tsx/ ./node_modules/tsx/
+
+# Create optimized startup script
+RUN echo '#!/bin/sh\n\
+set -e\n\
+\n\
+echo "🚀 Starting Jaguar SDK..."\n\
+\n\
+# Initialize database if needed\n\
+if [ ! -f /app/data/local.db ]; then\n\
+  echo "📊 Initializing database..."\n\
+  if [ -f node_modules/.bin/tsx ] && [ -f lib/db/migrate.ts ]; then\n\
+    node_modules/.bin/tsx lib/db/migrate.ts\n\
+    echo "✅ Database initialized"\n\
+  else\n\
+    echo "⚠️  Database migration skipped (tsx or migration file not found)"\n\
+  fi\n\
+fi\n\
+\n\
+# Start the application\n\
+echo "🌟 Starting Next.js server on port ${PORT:-3000}..."\n\
+exec node server.js' > /app/start.sh
+
+RUN chmod +x /app/start.sh && \
+    chown nextjs:nodejs /app/start.sh
+
+# Switch to non-root user
+USER nextjs
+
+# Set runtime environment
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV POSTGRES_URL="file:/app/data/local.db"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["/app/start.sh"]

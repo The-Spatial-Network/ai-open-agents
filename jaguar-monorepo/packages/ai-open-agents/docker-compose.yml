@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  # Open Web UI service
+  open-web-ui:
+    image: ghcr.io/open-webui/open-webui:0.6
+    container_name: open-web-ui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      OPENAI_API_BASE_URL: '${OPEN_ROUTER_API_BASE}'
+      OPENAI_API_KEY: '${OPEN_ROUTER_API_KEY}'
+      ENABLE_OLLAMA_API: 'false'
+      TOOL_SERVER_CONNECTIONS: |-
+        [
+          {
+            "url": "http://tool-server:8000",
+            "path": "openapi.json",
+            "auth_type": "bearer",
+            "key": "${TOOL_SERVER_API_KEY}",
+            "config": {"enable": true}
+          }
+        ]
+    volumes:
+      - open-web-ui-data:/app/backend/data
+    networks:
+      - ai-network
+    depends_on:
+      - tool-server
+
+  # Custom Tool Server
+  tool-server:
+    image: ghcr.io/the-spatial-network/ai-open-agents/tool-server:latest
+    build:
+      context: ./tools
+      dockerfile: Dockerfile
+    container_name: ai-tool-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_API_URL=${SUPABASE_API_URL}
+      - SUPABASE_API_KEY=${SUPABASE_API_KEY}
+    volumes:
+      - ./tools:/app
+    networks:
+      - ai-network
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  open-web-ui-data:
