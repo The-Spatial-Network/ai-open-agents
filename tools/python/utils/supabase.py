@@ -208,7 +208,7 @@ class SupabaseClient:
 
             # If document already exists, return it
             if doc_result:
-                return self.get_document_contents(project_id, doc_type_id)
+                return self.get_document_contents(project_id, doc_type_name)
             
             # Create new document
             new_doc = {
@@ -236,7 +236,7 @@ class SupabaseClient:
             
             self.client.table("document_content").insert(section_inserts).execute()
             
-            return self.get_document_contents(project_id, doc_type_id)
+            return self.get_document_contents(project_id, doc_type_name)
         except Exception as e:
             raise Exception(f"Failed to create document: {str(e)}")
 
