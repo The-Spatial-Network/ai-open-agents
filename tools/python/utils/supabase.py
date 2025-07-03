@@ -144,45 +144,20 @@ class SupabaseClient:
                     *,
                     document_content(
                         *,
-                        document_subsections(
-                            id, name, document_section_id, order, priority, content_type,
-                            document_sections(id, name, document_type_id, order)
-                        )
+                        document_subsections(*)
                     )
                 """) \
                 .eq("project_id", project_id) \
                 .eq("document_type_id", doc_type["id"]) \
                 .execute()
-            
+
             # If document doesn't exist, return empty structure
             if not doc_result.data or len(doc_result.data) == 0:
-                return {
-                    "document": None,
-                    "content": {}
-                }
-            
+                return
+
             document = doc_result.data[0]
-            content_items = document.get("document_content", [])
-            
-            # Organize content by subsection
-            organized_content = {}
-            for content_item in content_items:
-                subsection = content_item["document_subsections"]
-                subsection_id = subsection["id"]
-                
-                organized_content[subsection_id] = {
-                    "subsection": subsection,
-                    "content": content_item["content"]
-                }
-            
-            # Remove the content items from the document object to avoid duplication
-            if "document_content" in document:
-                del document["document_content"]
-            
-            return {
-                "document": document,
-                "content": organized_content
-            }
+
+            return document
         except Exception as e:
             raise Exception(f"Failed to retrieve document contents: {str(e)}")
 
