@@ -115,7 +115,7 @@ class Document(BaseModel):
     contents: Optional[List[DocumentContent]]
 
 class DocumentContentItem(BaseModel):
-    subsection_id: str
+    subsection_name: str
     content: Dict[str, Any]
 
 class ContentUpdate(BaseModel):
@@ -209,39 +209,40 @@ async def get_document_type(doc_type_name: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Document type not found: {str(e)}")
 
-@app.get("/documents/{project_id}/{doc_type_id}", response_model=Document, operation_id="get_document_contents")
-async def get_document_contents(project_id: str, doc_type_id: str):
+@app.get("/documents/{project_id}/{doc_type_name}", response_model=Document, operation_id="get_document_contents")
+async def get_document_contents(project_id: str, doc_type_name: str):
     """
     Retrieve all existing contents of a document.
     """
     try:
-        result = supabase_client.get_document_contents(project_id, doc_type_id)
+        result = supabase_client.get_document_contents(project_id, doc_type_name)
         return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Document not found: {str(e)}")
 
-@app.post("/documents/{project_id}/{doc_type_id}", response_model=Document, operation_id="create_document")
-async def create_document(project_id: str, doc_type_id: str):
+@app.post("/documents/{project_id}/{doc_type_name}", response_model=Document, operation_id="create_document")
+async def create_document(project_id: str, doc_type_name: str):
     """
     Create a new document.
     """
     try:
         result = supabase_client.create_document(
             project_id=project_id,
-            doc_type_id=doc_type_id,
+            doc_type_name=doc_type_name,
         )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
 
-@app.put("/documents/{document_id}", response_model=Document, operation_id="update_document_content")
-async def update_document_content(document_id: str, content_updates: ContentUpdate):
+@app.put("/documents/${project_id}/{doc_type_name}", response_model=Document, operation_id="update_document_content")
+async def update_document_content(project_id: str, doc_type_name: str, content_updates: ContentUpdate):
     """
     Update an existing document.
     """
     try:
         result = supabase_client.update_document_content(
-            document_id=document_id,
+            project_id=project_id,
+            doc_type_name=doc_type_name,
             content_items=content_updates.content_items
         )
         return result
