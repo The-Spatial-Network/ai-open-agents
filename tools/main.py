@@ -234,7 +234,7 @@ async def create_document(project_id: str, doc_type_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
 
-@app.put("/documents/${project_id}/{doc_type_name}", response_model=Document, operation_id="update_document_content")
+@app.put("/documents/{project_id}/{doc_type_name}", response_model=Document, operation_id="update_document_content")
 async def update_document_content(project_id: str, doc_type_name: str, content_updates: ContentUpdate):
     """
     Update an existing document.
