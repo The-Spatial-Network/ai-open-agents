@@ -215,7 +215,7 @@ class SupabaseClient:
         except Exception as e:
             raise Exception(f"Failed to create document: {str(e)}")
 
-    def update_document_content(self, project_id: str, doc_type_name: str, content_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def update_document_content(self, project_id: str, doc_type_name: str, content_items: List[Any]) -> Dict[str, Any]:
         """
         Update an existing document's content.
         
@@ -247,14 +247,13 @@ class SupabaseClient:
             # Process each content item
             content_updates = []
             for item in content_items:
-                subsection_name = item["subsection_name"]
+                subsection_name = item.subsection_name
                 subsection_id = subsection_map[subsection_name]
-                content = item["content"]
 
                 content_update = {
                     "document_id": document["id"],
                     "document_subsection_id": subsection_id,
-                    "content": content
+                    "content": item.content
                 }
                 content_updates.append(content_update)
             
