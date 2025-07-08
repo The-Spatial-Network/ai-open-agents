@@ -244,7 +244,7 @@ class SupabaseClient:
             if not document:
                 raise Exception(f"Document {doc_type_name} for project {project_id} not found")
             
-            document_contents = self.get_document_contents(project_id, doc_type_id)
+            document_contents = self.get_document_contents(project_id, doc_type_name)
 
             content_map = {}
             for content_entry in document_contents["document_content"]:
@@ -256,13 +256,20 @@ class SupabaseClient:
                 subsection_name = item.subsection_name
                 subsection_id = subsection_map[subsection_name]
                 existing_content = content_map.get(subsection_name, {})
+                existing_content_id = existing_content.get("id")
 
                 content_update = {
-                    "id": existing_content.get("id"),
                     "document_id": document["id"],
                     "document_subsection_id": subsection_id,
                     "content": item.content
                 }
+
+                if existing_content_id:
+                    content_update["id"] = existing_content_id
+                    for content_entry in document_contents["document_content"]:
+                        if existing_content_id == content_entry["id"]:
+                            content_entry.update(content_update)
+
                 content_updates.append(content_update)
             
             self.client.table("document_content").upsert(content_updates).execute()
