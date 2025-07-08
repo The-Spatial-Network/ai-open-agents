@@ -117,7 +117,7 @@ class Document(BaseModel):
 
 class DocumentContentItem(BaseModel):
     subsection_name: str
-    content: Dict[str, Any]
+    content: str
 
 class ContentUpdate(BaseModel):
     content_items: List[DocumentContentItem]
