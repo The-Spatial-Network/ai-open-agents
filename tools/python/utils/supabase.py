@@ -185,9 +185,11 @@ class SupabaseClient:
             if doc_result:
                 return self.get_document_contents(project_id, doc_type_name)
             
+            project = self.get_project(project_id)
+
             # Create new document
             new_doc = {
-                "title": doc_type['name'],
+                "title": f'{project["title"]} {doc_type["name"]}',
                 "project_id": project_id,
                 "document_type_id": doc_type_id,
                 "status": "draft"
