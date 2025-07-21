@@ -191,8 +191,7 @@ class SupabaseClient:
             new_doc = {
                 "title": f'{project["title"]} {doc_type["name"]}',
                 "project_id": project_id,
-                "document_type_id": doc_type_id,
-                "status": "draft"
+                "document_type_id": doc_type_id
             }
             doc_result = self.client.table("documents").insert(new_doc).execute()
             document = doc_result.data[0]

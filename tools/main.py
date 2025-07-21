@@ -110,7 +110,7 @@ class Document(BaseModel):
     document_type_id: str
     project_id: str
     chat_id: Optional[str] = None
-    status: str
+    published: bool
     created_at: str
     updated_at: Optional[str] = None
     document_content: Optional[List[DocumentContent]]
