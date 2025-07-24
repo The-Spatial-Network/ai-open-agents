@@ -4,6 +4,8 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional, Union
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 # Import utility modules
 from python.utils.supabase import SupabaseClient
@@ -11,6 +13,24 @@ from python.utils.github import GitHubClient
 
 # Load environment variables
 load_dotenv()
+
+# Initialize Sentry
+sentry_sdk.init(
+    dsn="https://f64eca0816f3dadfb4c7dcc1a0461e08@o4509532666724352.ingest.us.sentry.io/4509724856877056",
+    integrations=[
+        FastApiIntegration(auto_enabling_integrations=True),
+    ],
+    # Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0,
+    # Set profiles_sample_rate to 1.0 to profile 100% of sampled transactions.
+    # We recommend adjusting this value in production.
+    profiles_sample_rate=1.0,
+    # Capture 100% of the errors
+    sample_rate=1.0,
+    # Set environment
+    environment=os.getenv("STAGE", "development"),
+)
 
 # Initialize FastAPI app
 app = FastAPI(
